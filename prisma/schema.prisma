@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ChamberType {
+  HOUSE
+  SENATE
+  UNICAMERAL
+}
+
+enum PartisanLean {
+  D
+  R
+  NONPARTISAN
+  UNKNOWN
+}
+
+enum SponsorType {
+  CAMPAIGN_D
+  CAMPAIGN_R
+  PARTY_D
+  PARTY_R
+  INDEPENDENT_GROUP_D
+  INDEPENDENT_GROUP_R
+  NEWS_MEDIA
+  NONPARTISAN_PUBLIC
+  UNKNOWN
+}
+
+enum Population {
+  LV
+  RV
+  A
+  UNKNOWN
+}
+
+enum SourceKind {
+  RSS
+  HTML
+  X_HANDLE
+  PRESS_RELEASE_INDEX
+}
+
+enum SourceType {
+  PRESS_RELEASE
+  NEWS_ARTICLE
+  POLLSTER_MEMO
+  CAMPAIGN_SITE
+  CAUCUS_SITE
+  AGGREGATOR
+  SOCIAL_MEDIA
+  OTHER
+}
+
+enum PollStatus {
+  PUBLISHED
+  PENDING
+  REJECTED
+}
+
+model State {
+  code     String    @id @db.Char(2)
+  name     String    @unique
+  chambers Chamber[]
+  races    Race[]
+
+  @@map("states")
+}
+
+model Chamber {
+  id        String      @id
+  stateCode String      @db.Char(2)
+  type      ChamberType
+  name      String
+  state     State       @relation(fields: [stateCode], references: [code])
+  races     Race[]
+
+  @@index([stateCode])
+  @@map("chambers")
+}
+
+model Race {
+  id              String   @id
+  chamberId       String
+  stateCode       String   @db.Char(2)
+  district        String
+  electionYear    Int
+  electionDate    DateTime @db.Date
+  isSpecial       Boolean  @default(false)
+  dCandidate      String?
+  rCandidate      String?
+  otherCandidates String?
+  actualDPct      Float?
+  actualRPct      Float?
+  actualOtherPct  Float?
+  actualMargin    Float?
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  chamber         Chamber  @relation(fields: [chamberId], references: [id])
+  state           State    @relation(fields: [stateCode], references: [code])
+  polls           Poll[]
+
+  @@unique([chamberId, district, electionYear, isSpecial])
+  @@index([stateCode, electionYear])
+  @@index([electionYear])
+  @@map("races")
+}
+
+model Pollster {
+  slug                String       @id
+  name                String       @unique
+  defaultPartisanLean PartisanLean @default(UNKNOWN)
+  websiteUrl          String?
+  notes               String?      @db.Text
+  createdAt           DateTime     @default(now())
+  polls               Poll[]
+
+  @@map("pollsters")
+}
+
+model Poll {
+  id               String      @id @default(cuid())
+  raceId           String
+  pollsterSlug     String
+  sponsor          String
+  sponsorType      SponsorType
+  isPartisan       Boolean
+  startDate        DateTime    @db.Date
+  endDate          DateTime    @db.Date
+  sampleSize       Int?
+  population       Population  @default(UNKNOWN)
+  mode             String?
+  dPct             Float
+  rPct             Float
+  otherPct         Float       @default(0)
+  undecidedPct     Float       @default(0)
+  margin           Float
+  daysToElection   Int
+  methodologyNotes String?     @db.Text
+  sourceUrl        String
+  sourceType       SourceType
+  sourceArchiveUrl String?
+  status           PollStatus  @default(PUBLISHED)
+  addedBy          String?
+  addedAt          DateTime    @default(now())
+  race             Race        @relation(fields: [raceId], references: [id])
+  pollster         Pollster    @relation(fields: [pollsterSlug], references: [slug])
+
+  @@index([raceId])
+  @@index([pollsterSlug])
+  @@index([endDate])
+  @@index([status])
+  @@map("polls")
+}
+
+model Source {
+  id            String     @id @default(cuid())
+  url           String     @unique
+  label         String
+  kind          SourceKind
+  notes         String?
+  isActive      Boolean    @default(true)
+  lastScannedAt DateTime?
+  createdAt     DateTime   @default(now())
+
+  @@index([isActive])
+  @@map("sources")
+}
