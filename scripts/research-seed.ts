@@ -115,7 +115,11 @@ async function main() {
 
   console.log(`Research pass: ${tasks.length} (state × year) slices, concurrency=${concurrency}, writing to ${outPath}`)
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    timeout: 30 * 60 * 1000,
+    maxRetries: 1,
+  })
 
   let completed = 0
   let totalPolls = 0
@@ -155,18 +159,27 @@ async function runSlice(
 - Use web search aggressively across pollster archives, news, campaigns, party committees, and aggregators.
 - Return the JSON described in your system instructions.`
 
-  const msg = await anthropic.messages.create({
+  const useWebSearch = process.env.RESEARCH_WEB_SEARCH === '1'
+  const opts: Anthropic.MessageStreamParams = {
     model: 'claude-sonnet-4-6',
-    max_tokens: 16384,
+    max_tokens: 12288,
     system: SYSTEM,
-    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 12 } as never],
     messages: [{ role: 'user', content: userPrompt }],
-  })
+  }
+  if (useWebSearch) {
+    opts.tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 } as never]
+  }
 
-  const text = msg.content
+  const stream = anthropic.messages.stream(opts)
+  const final = await stream.finalMessage()
+  const text = final.content
     .filter((c) => c.type === 'text')
     .map((c) => (c as { text: string }).text)
     .join('\n')
+
+  if (process.env.RESEARCH_DEBUG === '1') {
+    process.stdout.write(`\n--- RAW RESPONSE for ${state} ${year} ---\n${text.slice(0, 3000)}\n--- END ---\n`)
+  }
 
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (!jsonMatch) return { polls: [] }
