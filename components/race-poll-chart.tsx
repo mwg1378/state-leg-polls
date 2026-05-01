@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import { format } from 'date-fns'
 import { sponsorLean } from '@/lib/labels'
-import type { SponsorType } from '@/lib/generated/prisma/enums'
+import type { SponsorType } from '@db/enums'
 
 export type ChartPoint = {
   endDate: string

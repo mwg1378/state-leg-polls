@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import { sponsorLean, SPONSOR_TYPE_LABELS } from '@/lib/labels'
-import type { SponsorType } from '@/lib/generated/prisma/enums'
+import type { SponsorType } from '@db/enums'
 
 export function SponsorBadge({
   sponsor,

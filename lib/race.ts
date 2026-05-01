@@ -1,5 +1,5 @@
 import { CHAMBER_TYPE_SHORT } from '@/lib/labels'
-import type { ChamberType } from '@/lib/generated/prisma/enums'
+import type { ChamberType } from '@db/enums'
 
 export function raceTitle(args: {
   stateCode: string

@@ -1,5 +1,5 @@
 import { DAYS_BUCKETS } from '@/lib/accuracy'
-import type { Prisma } from '@/lib/generated/prisma/client'
+import type { Prisma } from '@db/client'
 
 export type PollFilterParams = {
   state?: string

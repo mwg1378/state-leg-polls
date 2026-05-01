@@ -1,4 +1,4 @@
-import type { SponsorType } from '@/lib/generated/prisma/enums'
+import type { SponsorType } from '@db/enums'
 import { sponsorLean } from '@/lib/labels'
 
 export type ScoredPoll = {

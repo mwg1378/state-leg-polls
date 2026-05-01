@@ -1,4 +1,4 @@
-import type { ChamberType, PartisanLean, Population, SourceType, SponsorType } from '@/lib/generated/prisma/enums'
+import type { ChamberType, PartisanLean, Population, SourceType, SponsorType } from '@db/enums'
 
 export const SPONSOR_TYPE_LABELS: Record<SponsorType, string> = {
   CAMPAIGN_D: 'D campaign',

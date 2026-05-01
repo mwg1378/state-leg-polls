@@ -1,10 +1,13 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['@prisma/client', '@prisma/adapter-pg', 'pg'],
   outputFileTracingIncludes: {
-    '/**/*': ['./lib/generated/prisma/**/*'],
+    '/**': [
+      './lib/generated/prisma/**/*.node',
+      './lib/generated/prisma/schema.prisma',
+    ],
   },
-  serverExternalPackages: ['@prisma/client'],
 }
 
 export default nextConfig

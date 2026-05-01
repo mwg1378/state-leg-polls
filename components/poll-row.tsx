@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { fmtDateRange, fmtMargin, fmtNum, fmtPct } from '@/lib/format'
 import { SponsorBadge } from '@/components/sponsor-badge'
-import type { ChamberType, Population, SponsorType } from '@/lib/generated/prisma/enums'
+import type { ChamberType, Population, SponsorType } from '@db/enums'
 
 export type PollRowData = {
   id: string
