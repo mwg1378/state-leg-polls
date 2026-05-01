@@ -4,8 +4,23 @@ loadEnv()
 
 import { PrismaClient } from '../lib/generated/prisma/client'
 import { ChamberType, PartisanLean, SourceKind } from '../lib/generated/prisma/enums'
+import { PrismaPg } from '@prisma/adapter-pg'
+import pg from 'pg'
 
-const prisma = new PrismaClient()
+function makePrismaClient() {
+  const cs = process.env.DIRECT_URL || process.env.DATABASE_URL!
+  const u = new URL(cs)
+  const pool = new pg.Pool({
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    host: u.hostname,
+    port: parseInt(u.port || '5432', 10),
+    database: u.pathname.slice(1),
+    ssl: { rejectUnauthorized: false },
+  })
+  return new PrismaClient({ adapter: new PrismaPg(pool) })
+}
+const prisma = makePrismaClient()
 
 const STATES: Array<[string, string]> = [
   ['AL', 'Alabama'], ['AK', 'Alaska'], ['AZ', 'Arizona'], ['AR', 'Arkansas'],

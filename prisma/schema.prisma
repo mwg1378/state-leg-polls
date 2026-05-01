@@ -1,15 +1,12 @@
 generator client {
-  provider      = "prisma-client"
-  output        = "../lib/generated/prisma"
-  runtime       = "nodejs"
-  moduleFormat  = "cjs"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  provider     = "prisma-client"
+  output       = "../lib/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "cjs"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 enum ChamberType {

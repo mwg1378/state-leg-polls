@@ -14,8 +14,23 @@ loadEnv()
 import readline from 'node:readline/promises'
 import { stdin, stdout } from 'node:process'
 import { PrismaClient } from '../lib/generated/prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import pg from 'pg'
 
-const prisma = new PrismaClient()
+function makePrismaClient() {
+  const cs = process.env.DIRECT_URL || process.env.DATABASE_URL!
+  const u = new URL(cs)
+  const pool = new pg.Pool({
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    host: u.hostname,
+    port: parseInt(u.port || '5432', 10),
+    database: u.pathname.slice(1),
+    ssl: { rejectUnauthorized: false },
+  })
+  return new PrismaClient({ adapter: new PrismaPg(pool) })
+}
+const prisma = makePrismaClient()
 
 async function main() {
   const args = new Set(process.argv.slice(2))
