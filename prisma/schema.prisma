@@ -9,10 +9,15 @@ datasource db {
   provider = "postgresql"
 }
 
-enum ChamberType {
-  HOUSE
-  SENATE
-  UNICAMERAL
+enum RaceType {
+  PARTISAN_PRIMARY
+  NONPARTISAN_PRIMARY
+  GENERAL
+  NONPARTISAN_GENERAL
+  RUNOFF
+  SPECIAL_GENERAL
+  SPECIAL_PRIMARY
+  SPECIAL_RUNOFF
 }
 
 enum PartisanLean {
@@ -23,12 +28,9 @@ enum PartisanLean {
 }
 
 enum SponsorType {
-  CAMPAIGN_D
-  CAMPAIGN_R
-  PARTY_D
-  PARTY_R
-  INDEPENDENT_GROUP_D
-  INDEPENDENT_GROUP_R
+  CAMPAIGN
+  PARTY
+  INDEPENDENT_GROUP
   NEWS_MEDIA
   NONPARTISAN_PUBLIC
   UNKNOWN
@@ -53,8 +55,8 @@ enum SourceType {
   NEWS_ARTICLE
   POLLSTER_MEMO
   CAMPAIGN_SITE
-  CAUCUS_SITE
   AGGREGATOR
+  WIKIPEDIA
   SOCIAL_MEDIA
   OTHER
 }
@@ -65,52 +67,46 @@ enum PollStatus {
   REJECTED
 }
 
-model State {
-  code     String    @id @db.Char(2)
-  name     String    @unique
-  chambers Chamber[]
-  races    Race[]
+model City {
+  slug       String  @id
+  name       String
+  stateCode  String  @db.Char(2)
+  population Int
+  notes      String? @db.Text
+  createdAt  DateTime @default(now())
+  races      Race[]
 
-  @@map("states")
-}
-
-model Chamber {
-  id        String      @id
-  stateCode String      @db.Char(2)
-  type      ChamberType
-  name      String
-  state     State       @relation(fields: [stateCode], references: [code])
-  races     Race[]
-
+  @@unique([name, stateCode])
   @@index([stateCode])
-  @@map("chambers")
+  @@map("cities")
 }
 
 model Race {
-  id              String   @id
-  chamberId       String
-  stateCode       String   @db.Char(2)
-  district        String
-  electionYear    Int
-  electionDate    DateTime @db.Date
-  isSpecial       Boolean  @default(false)
-  dCandidate      String?
-  rCandidate      String?
-  otherCandidates String?
-  actualDPct      Float?
-  actualRPct      Float?
-  actualOtherPct  Float?
-  actualMargin    Float?
-  notes           String?  @db.Text
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  chamber         Chamber  @relation(fields: [chamberId], references: [id])
-  state           State    @relation(fields: [stateCode], references: [code])
-  polls           Poll[]
+  id            String   @id
+  citySlug      String
+  electionDate  DateTime @db.Date
+  electionYear  Int
+  raceType      RaceType
+  party         String?
+  isOpenSeat    Boolean  @default(false)
+  // [{ name: string, party?: string, pct: number, isIncumbent?: boolean, advanced?: boolean }]
+  actualResults Json?
+  // Convenience denormalized fields:
+  winnerName    String?
+  winnerPct     Float?
+  runnerUpName  String?
+  runnerUpPct   Float?
+  topMargin     Float?   // winnerPct - runnerUpPct
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  city          City     @relation(fields: [citySlug], references: [slug])
+  polls         Poll[]
 
-  @@unique([chamberId, district, electionYear, isSpecial])
-  @@index([stateCode, electionYear])
+  @@unique([citySlug, electionDate, raceType, party])
+  @@index([citySlug, electionYear])
   @@index([electionYear])
+  @@index([raceType])
   @@map("races")
 }
 
@@ -132,17 +128,20 @@ model Poll {
   pollsterSlug     String
   sponsor          String
   sponsorType      SponsorType
-  isPartisan       Boolean
+  // [{ name: string, party?: string, pct: number }]
+  candidates       Json
+  // Convenience denormalized fields:
+  topName          String
+  topPct           Float
+  runnerUpName     String?
+  runnerUpPct      Float?
+  topMargin        Float       // topPct - runnerUpPct (or 100 if uncontested-like)
+  undecidedPct     Float       @default(0)
   startDate        DateTime    @db.Date
   endDate          DateTime    @db.Date
   sampleSize       Int?
   population       Population  @default(UNKNOWN)
   mode             String?
-  dPct             Float
-  rPct             Float
-  otherPct         Float       @default(0)
-  undecidedPct     Float       @default(0)
-  margin           Float
   daysToElection   Int
   methodologyNotes String?     @db.Text
   sourceUrl        String

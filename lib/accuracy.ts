@@ -1,45 +1,130 @@
-import type { SponsorType } from '@db/enums'
-import { sponsorLean } from '@/lib/labels'
+import type { RaceType, SponsorType } from '@db/enums'
+
+export type CandidateResult = {
+  name: string
+  party?: string | null
+  pct: number
+  isIncumbent?: boolean
+  advanced?: boolean
+}
 
 export type ScoredPoll = {
-  margin: number
+  pollId: string
+  raceId: string
+  candidates: CandidateResult[]   // poll's measurement
+  actuals: CandidateResult[]      // race's actual result
   daysToElection: number
   sponsorType: SponsorType
+  raceType: RaceType
   electionYear: number
-  actualMargin: number
 }
 
-export type AccuracyStats = {
-  n: number
-  pctWithin3: number | null
-  pctWithin5: number | null
-  medianAbsError: number | null
-  meanSignedError: number | null
+// ────────────────────────────────────────────────────────────────────────────
+// Per-poll accuracy metrics
+// ────────────────────────────────────────────────────────────────────────────
+
+const norm = (s: string) =>
+  s.toLowerCase().replace(/\(.+?\)/g, '').replace(/[^a-z0-9 ]/g, '').trim().split(/\s+/).slice(-1)[0]
+
+function matchActual(name: string, actuals: CandidateResult[]): CandidateResult | undefined {
+  const n = norm(name)
+  return (
+    actuals.find((a) => norm(a.name) === n) ||
+    actuals.find((a) => norm(a.name).startsWith(n)) ||
+    actuals.find((a) => n.startsWith(norm(a.name)))
+  )
 }
 
-export function computeStats(polls: ScoredPoll[]): AccuracyStats {
-  if (polls.length === 0) {
-    return { n: 0, pctWithin3: null, pctWithin5: null, medianAbsError: null, meanSignedError: null }
+/** Did the poll's leading candidate match the actual winner? null if data missing. */
+export function calledWinner(poll: ScoredPoll): boolean | null {
+  const top = sortByPct(poll.candidates)[0]
+  const winner = sortByPct(poll.actuals)[0]
+  if (!top || !winner) return null
+  return norm(top.name) === norm(winner.name)
+}
+
+/** Did the poll's top 2 match the actual top 2 (set-equality, order-independent)? */
+export function calledTopTwo(poll: ScoredPoll): boolean | null {
+  const pollTop2 = sortByPct(poll.candidates).slice(0, 2)
+  const realTop2 = sortByPct(poll.actuals).slice(0, 2)
+  if (pollTop2.length < 2 || realTop2.length < 2) return null
+  const a = new Set(pollTop2.map((c) => norm(c.name)))
+  const b = new Set(realTop2.map((c) => norm(c.name)))
+  if (a.size !== 2 || b.size !== 2) return null
+  return [...a].every((x) => b.has(x))
+}
+
+/** Mean |poll_pct − actual_pct| across candidates that appear in both lists. */
+export function meanCandidateError(poll: ScoredPoll): number | null {
+  const errors: number[] = []
+  for (const p of poll.candidates) {
+    const a = matchActual(p.name, poll.actuals)
+    if (a) errors.push(Math.abs(p.pct - a.pct))
   }
-  const errors = polls.map((p) => p.margin - p.actualMargin)
-  const absErrors = errors.map((e) => Math.abs(e))
-  const within3 = absErrors.filter((e) => e <= 3).length
-  const within5 = absErrors.filter((e) => e <= 5).length
-  const sorted = [...absErrors].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
-  const mean = errors.reduce((s, e) => s + e, 0) / errors.length
+  if (errors.length === 0) return null
+  return errors.reduce((s, e) => s + e, 0) / errors.length
+}
+
+/** |poll(top1−top2) − actual(top1−top2)|. */
+export function topTwoMarginError(poll: ScoredPoll): number | null {
+  const p = sortByPct(poll.candidates)
+  const a = sortByPct(poll.actuals)
+  if (p.length < 2 || a.length < 2) return null
+  const pollMargin = p[0].pct - p[1].pct
+  const actualMargin = a[0].pct - a[1].pct
+  return Math.abs(pollMargin - actualMargin)
+}
+
+function sortByPct(cs: CandidateResult[]): CandidateResult[] {
+  return [...cs].sort((a, b) => b.pct - a.pct)
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Aggregate stats over a slice of polls
+// ────────────────────────────────────────────────────────────────────────────
+
+export type AggregateStats = {
+  n: number
+  pctCalledWinner: number | null
+  pctCalledTopTwo: number | null
+  medianCandidateError: number | null
+  meanCandidateError: number | null
+  medianMarginError: number | null
+}
+
+export function computeAggregate(polls: ScoredPoll[]): AggregateStats {
+  if (polls.length === 0) {
+    return { n: 0, pctCalledWinner: null, pctCalledTopTwo: null, medianCandidateError: null, meanCandidateError: null, medianMarginError: null }
+  }
+  const winners = polls.map(calledWinner).filter((x): x is boolean => x !== null)
+  const topTwos = polls.map(calledTopTwo).filter((x): x is boolean => x !== null)
+  const candErrors = polls.map(meanCandidateError).filter((x): x is number => x !== null)
+  const marginErrors = polls.map(topTwoMarginError).filter((x): x is number => x !== null)
+
   return {
     n: polls.length,
-    pctWithin3: (within3 / polls.length) * 100,
-    pctWithin5: (within5 / polls.length) * 100,
-    medianAbsError: median,
-    meanSignedError: mean,
+    pctCalledWinner: winners.length > 0 ? (winners.filter(Boolean).length / winners.length) * 100 : null,
+    pctCalledTopTwo: topTwos.length > 0 ? (topTwos.filter(Boolean).length / topTwos.length) * 100 : null,
+    medianCandidateError: median(candErrors),
+    meanCandidateError: candErrors.length > 0 ? candErrors.reduce((s, e) => s + e, 0) / candErrors.length : null,
+    medianMarginError: median(marginErrors),
   }
 }
 
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null
+  const s = [...xs].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Cuts
+// ────────────────────────────────────────────────────────────────────────────
+
 export const DAYS_BUCKETS: Array<{ id: string; label: string; min: number; max: number }> = [
-  { id: '0-14', label: '0–14 days out', min: 0, max: 14 },
+  { id: '0-7', label: '0–7 days out', min: 0, max: 7 },
+  { id: '8-14', label: '8–14 days out', min: 8, max: 14 },
   { id: '15-30', label: '15–30 days out', min: 15, max: 30 },
   { id: '31-60', label: '31–60 days out', min: 31, max: 60 },
   { id: '61-120', label: '61–120 days out', min: 61, max: 120 },
@@ -52,10 +137,6 @@ export function inDaysBucket(days: number, bucketId: string): boolean {
   return days >= b.min && days <= b.max
 }
 
-export function filterBySponsor(polls: ScoredPoll[], cut: 'all' | 'nonpartisan' | 'D' | 'R'): ScoredPoll[] {
-  if (cut === 'all') return polls
-  if (cut === 'nonpartisan') {
-    return polls.filter((p) => p.sponsorType === 'NEWS_MEDIA' || p.sponsorType === 'NONPARTISAN_PUBLIC')
-  }
-  return polls.filter((p) => sponsorLean(p.sponsorType) === cut)
+export function isPartisanSponsor(s: SponsorType): boolean {
+  return s === 'CAMPAIGN' || s === 'PARTY' || s === 'INDEPENDENT_GROUP'
 }

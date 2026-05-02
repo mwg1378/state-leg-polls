@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { sponsorLean, SPONSOR_TYPE_LABELS } from '@/lib/labels'
+import { SPONSOR_TYPE_LABELS } from '@/lib/labels'
 import type { SponsorType } from '@db/enums'
 
 export function SponsorBadge({
@@ -11,14 +11,13 @@ export function SponsorBadge({
   sponsorType: SponsorType
   compact?: boolean
 }) {
-  const lean = sponsorLean(sponsorType)
-  const cls =
-    lean === 'D'
-      ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-      : lean === 'R'
-        ? 'bg-red-500/15 text-red-300 border-red-500/30'
-        : 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30'
-  const partisan = lean !== 'NEUTRAL'
+  const partisan =
+    sponsorType === 'CAMPAIGN' || sponsorType === 'PARTY' || sponsorType === 'INDEPENDENT_GROUP'
+  const cls = partisan
+    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+    : sponsorType === 'NEWS_MEDIA'
+      ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+      : 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30'
   return (
     <span
       title={SPONSOR_TYPE_LABELS[sponsorType]}
@@ -27,8 +26,8 @@ export function SponsorBadge({
         cls,
       )}
     >
-      {partisan ? <span className="font-bold">{lean}</span> : null}
-      <span className="font-normal opacity-90">{compact ? truncate(sponsor, 28) : sponsor}</span>
+      {partisan ? <span className="font-bold">P</span> : null}
+      <span className="font-normal opacity-90">{compact ? truncate(sponsor, 30) : sponsor}</span>
     </span>
   )
 }

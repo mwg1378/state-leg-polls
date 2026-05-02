@@ -1,7 +1,10 @@
 import Link from 'next/link'
-import { fmtDateRange, fmtMargin, fmtNum, fmtPct } from '@/lib/format'
+import { fmtDateRange, fmtNum, fmtPct } from '@/lib/format'
 import { SponsorBadge } from '@/components/sponsor-badge'
-import type { ChamberType, Population, SponsorType } from '@db/enums'
+import { partyColor, RACE_TYPE_SHORT } from '@/lib/labels'
+import type { Population, RaceType, SponsorType } from '@db/enums'
+
+export type Candidate = { name: string; party?: string | null; pct: number }
 
 export type PollRowData = {
   id: string
@@ -10,23 +13,24 @@ export type PollRowData = {
   daysToElection: number
   sponsor: string
   sponsorType: SponsorType
-  dPct: number
-  rPct: number
-  otherPct: number
+  candidates: Candidate[]
+  topName: string
+  topPct: number
+  runnerUpName: string | null
+  runnerUpPct: number | null
+  topMargin: number
   undecidedPct: number
-  margin: number
   sampleSize: number | null
   population: Population
   sourceUrl: string
   pollster: { slug: string; name: string }
   race: {
     id: string
-    stateCode: string
-    district: string
+    citySlug: string
+    raceType: RaceType
     electionYear: number
-    dCandidate: string | null
-    rCandidate: string | null
-    chamber: { type: ChamberType; name: string }
+    party: string | null
+    city: { name: string; stateCode: string }
   }
 }
 
@@ -37,9 +41,12 @@ export function PollRow({ poll, showRace = true }: { poll: PollRowData; showRace
       {showRace ? (
         <td className="px-3 py-2 align-top">
           <Link href={`/races/${r.id}`} className="font-medium hover:underline">
-            {r.stateCode} {r.chamber.type === 'HOUSE' ? 'House' : r.chamber.type === 'SENATE' ? 'Senate' : 'Leg'} {r.district}
+            {r.city.name}, {r.city.stateCode}
           </Link>
-          <div className="text-xs text-muted-foreground">{r.electionYear}</div>
+          <div className="text-xs text-muted-foreground">
+            {r.electionYear} · {RACE_TYPE_SHORT[r.raceType]}
+            {r.party ? ` (${r.party})` : ''}
+          </div>
         </td>
       ) : null}
       <td className="px-3 py-2 align-top">
@@ -55,13 +62,23 @@ export function PollRow({ poll, showRace = true }: { poll: PollRowData; showRace
         <SponsorBadge sponsor={poll.sponsor} sponsorType={poll.sponsorType} compact />
       </td>
       <td className="px-3 py-2 align-top text-sm">
-        <span className="text-blue-400">{fmtPct(poll.dPct)}</span>
-        {' / '}
-        <span className="text-red-400">{fmtPct(poll.rPct)}</span>
-        {poll.otherPct > 0 ? <span className="text-muted-foreground"> / {fmtPct(poll.otherPct)}</span> : null}
-        {poll.undecidedPct > 0 ? <span className="text-muted-foreground"> · und {fmtPct(poll.undecidedPct, 0)}</span> : null}
+        <div className="space-y-0.5">
+          {poll.candidates.slice(0, 4).map((c, i) => (
+            <div key={i} className="flex items-baseline gap-2 leading-tight">
+              <span className={`text-xs ${partyColor(c.party)}`}>{c.party ?? ''}</span>
+              <span className="font-medium">{shortName(c.name)}</span>
+              <span className="ml-auto font-mono tabular-nums">{c.pct.toFixed(1)}</span>
+            </div>
+          ))}
+          {poll.candidates.length > 4 ? (
+            <div className="text-xs text-muted-foreground">+{poll.candidates.length - 4} more</div>
+          ) : null}
+          {poll.undecidedPct > 0 ? (
+            <div className="text-xs text-muted-foreground">und {poll.undecidedPct.toFixed(0)}%</div>
+          ) : null}
+        </div>
       </td>
-      <td className="px-3 py-2 align-top text-sm font-mono">{fmtMargin(poll.margin)}</td>
+      <td className="px-3 py-2 align-top text-sm font-mono">+{poll.topMargin.toFixed(1)}</td>
       <td className="px-3 py-2 align-top text-xs text-muted-foreground">
         {poll.sampleSize ? `${fmtNum(poll.sampleSize)} ${poll.population === 'LV' ? 'LV' : poll.population === 'RV' ? 'RV' : poll.population === 'A' ? 'A' : ''}` : '—'}
       </td>
@@ -87,11 +104,17 @@ export function PollTableHeader({ showRace = true }: { showRace?: boolean }) {
         <th className="px-3 py-2 text-left font-medium">Field dates</th>
         <th className="px-3 py-2 text-left font-medium">Pollster</th>
         <th className="px-3 py-2 text-left font-medium">Sponsor</th>
-        <th className="px-3 py-2 text-left font-medium">D / R / 3rd</th>
-        <th className="px-3 py-2 text-left font-medium">Margin</th>
+        <th className="px-3 py-2 text-left font-medium">Top candidates</th>
+        <th className="px-3 py-2 text-left font-medium">Lead</th>
         <th className="px-3 py-2 text-left font-medium">Sample</th>
         <th className="px-3 py-2 text-left font-medium">Source</th>
       </tr>
     </thead>
   )
+}
+
+function shortName(name: string): string {
+  // Take last word as a heuristic short label.
+  const parts = name.replace(/\(.+?\)/g, '').trim().split(/\s+/)
+  return parts.length > 1 ? parts[parts.length - 1] : name
 }

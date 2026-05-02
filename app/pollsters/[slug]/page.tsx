@@ -2,8 +2,9 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/prisma/client'
 import { PollsTable } from '@/components/polls-table'
 import { AccuracyCard } from '@/components/accuracy-card'
-import { computeStats, type ScoredPoll } from '@/lib/accuracy'
+import { computeAggregate, type ScoredPoll, type CandidateResult } from '@/lib/accuracy'
 import { PARTISAN_LEAN_LABELS } from '@/lib/labels'
+import { toPollRow } from '@/app/page'
 
 export const revalidate = 300
 
@@ -23,9 +24,9 @@ export default async function PollsterPage({
           pollster: { select: { slug: true, name: true } },
           race: {
             select: {
-              id: true, stateCode: true, district: true, electionYear: true, dCandidate: true, rCandidate: true,
-              actualMargin: true,
-              chamber: { select: { type: true, name: true } },
+              id: true, citySlug: true, raceType: true, electionYear: true, party: true,
+              actualResults: true,
+              city: { select: { name: true, stateCode: true } },
             },
           },
         },
@@ -35,17 +36,20 @@ export default async function PollsterPage({
   if (!pollster) return notFound()
 
   const scoreable: ScoredPoll[] = pollster.polls
-    .filter((p) => p.race.actualMargin != null)
+    .filter((p) => p.race.actualResults != null)
     .map((p) => ({
-      margin: p.margin,
+      pollId: p.id,
+      raceId: p.raceId,
+      candidates: p.candidates as CandidateResult[],
+      actuals: p.race.actualResults as CandidateResult[],
       daysToElection: p.daysToElection,
       sponsorType: p.sponsorType,
+      raceType: p.race.raceType,
       electionYear: p.race.electionYear,
-      actualMargin: p.race.actualMargin as number,
     }))
 
-  const stats = computeStats(scoreable)
-  const within30 = computeStats(scoreable.filter((s) => s.daysToElection <= 30))
+  const overall = computeAggregate(scoreable)
+  const within30 = computeAggregate(scoreable.filter((s) => s.daysToElection <= 30))
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-8 space-y-8">
@@ -53,7 +57,7 @@ export default async function PollsterPage({
         <div className="text-sm uppercase tracking-wide text-muted-foreground">Pollster</div>
         <h1 className="text-2xl font-bold tracking-tight">{pollster.name}</h1>
         <div className="text-sm text-muted-foreground">
-          {PARTISAN_LEAN_LABELS[pollster.defaultPartisanLean]} · {pollster.polls.length} state-leg poll{pollster.polls.length === 1 ? '' : 's'}
+          {PARTISAN_LEAN_LABELS[pollster.defaultPartisanLean]} · {pollster.polls.length} mayoral poll{pollster.polls.length === 1 ? '' : 's'}
           {pollster.websiteUrl ? (
             <>
               {' · '}
@@ -66,13 +70,13 @@ export default async function PollsterPage({
       </header>
 
       <section className="grid gap-3 sm:grid-cols-2">
-        <AccuracyCard title="All scoreable polls" sub="Races with known result" stats={stats} />
+        <AccuracyCard title="All scoreable polls" sub="Races with known result" stats={overall} />
         <AccuracyCard title="Within 30 days of election" sub="Races with known result" stats={within30} />
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Polls</h2>
-        <PollsTable polls={pollster.polls} />
+        <PollsTable polls={pollster.polls.map(toPollRow)} />
       </section>
     </div>
   )

@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'About / Methodology — state-leg-polls',
+  title: 'About / Methodology — mayor-polls',
 }
 
 export default function AboutPage() {
@@ -10,73 +10,75 @@ export default function AboutPage() {
       <section>
         <h2 className="mt-6 text-lg font-semibold">What this site is</h2>
         <p className="mt-2">
-          A best-effort exhaustive aggregator of polls released on individual <strong>state legislative
-          general election</strong> races — all 50 states, both chambers, since 2017.
-          Primary elections, gubernatorial / federal races, and generic-ballot or chamber-control polls are
-          out of scope.
+          A pollster-accuracy tracker for US big-city mayoral elections. We aggregate publicly-released polls of
+          mayoral primaries, general elections, and runoffs in cities of <strong>200,000+ population</strong>, score
+          each poll against the actual result, and surface accuracy stats by pollster, race type, sponsor type, and
+          days-to-election.
+        </p>
+        <p className="mt-2">
+          The motivation: 538/Silver Bulletin/Race-to-the-WH have rich data on national, gubernatorial, and Senate
+          polling, but mayoral races are conspicuously absent — even for Chicago, NYC, LA, Seattle, and similar.
         </p>
       </section>
 
       <section>
         <h2 className="mt-6 text-lg font-semibold">What counts as a poll</h2>
         <p className="mt-2">
-          We include any poll that asks about head-to-head support among two or more named candidates
-          for a specific state legislative seat in a regularly-scheduled or special general election.
-          Both <em>nonpartisan/public</em> polls (universities, news media, independent firms) and
-          <em> partisan internals</em> (campaigns, party committees, allied groups) are included — the
-          latter are clearly labeled with a sponsor type and a colored badge.
+          Any poll asking about head-to-head support among named candidates for a specific mayoral race in our
+          covered cities. Both <em>nonpartisan/public</em> polls (universities, news media, independent firms)
+          and <em>partisan internals</em> (campaigns, party committees, aligned groups) are included — the
+          latter clearly labeled with sponsor type.
         </p>
+        <p className="mt-2">
+          Generic-ballot or favorability polls without head-to-head matchups are out of scope. Same for
+          gubernatorial / federal / state-leg polls.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="mt-6 text-lg font-semibold">Multi-candidate polls</h2>
+        <p className="mt-2">
+          Mayoral primaries often have 5–10 viable candidates; meaningful margins aren't always top-1 minus top-2.
+          We store each poll's <strong>full candidate list</strong> and the race's <strong>full final result</strong>,
+          and compute four accuracy metrics per poll, none privileged over the others:
+        </p>
+        <ul className="ml-6 mt-2 list-disc space-y-1">
+          <li><strong>Called winner</strong> — did the poll's leading candidate match the actual winner?</li>
+          <li><strong>Called top 2</strong> — did the poll's top 2 (set, order-independent) match the actual top 2?</li>
+          <li><strong>Mean per-candidate error</strong> — average <code>|poll_pct − actual_pct|</code> across candidates that appear in both the poll and the result.</li>
+          <li><strong>Top-two margin error</strong> — <code>|poll(top1−top2) − actual(top1−top2)|</code>, the traditional 538-style metric.</li>
+        </ul>
       </section>
 
       <section>
         <h2 className="mt-6 text-lg font-semibold">How polls are sourced</h2>
         <p className="mt-2">
-          Initial seed: a one-time research pass across pollster archives, news search,
-          campaign press releases, party caucus releases, Ballotpedia, The Downballot, and other
-          aggregators — orchestrated by Claude with manual review before import.
+          Initial seed: a curated extraction pass against Wikipedia per-race pages (which have surprisingly
+          full polling tables for big-city mayoral races) plus targeted news / pollster URLs. All extraction
+          uses Claude with a strict JSON schema; results are reviewed before publishing.
         </p>
         <p className="mt-2">
-          Ongoing: a weekly cron job re-scans a list of configured sources, extracts candidate poll
-          records via Claude, and queues them as <code>PENDING</code> for human review before
-          publishing.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="mt-6 text-lg font-semibold">Margin convention</h2>
-        <p className="mt-2">
-          All margins are <strong>D−R</strong> in points. <code>D+5</code> means the Democrat leads by 5;
-          <code> R+2</code> means the Republican leads by 2. Polls with no Democratic or no Republican
-          candidate in the race are still included; the margin is computed against the strongest top-two
-          candidates as released.
+          Ongoing: a weekly cron job scans configured sources, extracts candidate poll records, and queues them
+          as <code>PENDING</code> for human review before going live.
         </p>
       </section>
 
       <section>
-        <h2 className="mt-6 text-lg font-semibold">Accuracy scoring</h2>
+        <h2 className="mt-6 text-lg font-semibold">Population threshold</h2>
         <p className="mt-2">
-          A poll is &ldquo;in scope for accuracy&rdquo; if its race has an actual result entered. We
-          report:
-        </p>
-        <ul className="ml-6 mt-2 list-disc space-y-1">
-          <li><strong>% within 3 points</strong> of the actual D−R margin</li>
-          <li><strong>% within 5 points</strong> of the actual D−R margin</li>
-          <li><strong>Median absolute error</strong> on the D−R margin</li>
-          <li><strong>Mean signed error</strong> (D−R) — positive values indicate a poll-side D-leaning bias</li>
-        </ul>
-        <p className="mt-2">
-          Cuts are computed independently — a poll counts in every applicable bucket.
+          We track cities with population <strong>≥ 200,000</strong> (about 120 US cities), based on 2020 Census
+          and post-2020 estimates.
         </p>
       </section>
 
       <section>
         <h2 className="mt-6 text-lg font-semibold">Caveats</h2>
         <ul className="ml-6 mt-2 list-disc space-y-1">
-          <li>State leg polling is sparse and uneven — most state-year combos have zero polls.</li>
-          <li>Partisan internals are systematically biased; we publish them for transparency, not endorsement.</li>
-          <li>Special elections are tracked when encountered but not exhaustively backfilled.</li>
+          <li>Not every covered city's mayoral races have publicly-available polls — most don't.</li>
+          <li>Partisan internals are biased by definition; we publish them for transparency, not endorsement.</li>
+          <li>Multi-round elections (top-two primary → general, or general → runoff) are tracked as separate races.</li>
           <li>Found a missing poll or an error? File an issue on{' '}
-            <a className="hover:underline" href="https://github.com/mwg1378/state-leg-polls/issues" target="_blank" rel="noopener">GitHub</a>.</li>
+            <a className="hover:underline" href="https://github.com/mwg1378/mayor-polls/issues" target="_blank" rel="noopener">GitHub</a>.</li>
         </ul>
       </section>
     </div>

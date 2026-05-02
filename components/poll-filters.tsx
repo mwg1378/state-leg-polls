@@ -7,12 +7,12 @@ import { DAYS_BUCKETS } from '@/lib/accuracy'
 type Option = { value: string; label: string }
 
 type FiltersProps = {
-  states: Option[]
+  cities: Option[]
   pollsters: Option[]
   years: number[]
 }
 
-export function PollFilters({ states, pollsters, years }: FiltersProps) {
+export function PollFilters({ cities, pollsters, years }: FiltersProps) {
   const router = useRouter()
   const params = useSearchParams()
   const [pending, startTransition] = useTransition()
@@ -28,30 +28,18 @@ export function PollFilters({ states, pollsters, years }: FiltersProps) {
 
   return (
     <div className="flex flex-wrap items-end gap-3 text-sm" data-pending={pending ? '' : undefined}>
-      <Field label="State">
+      <Field label="City">
         <select
-          value={v('state')}
-          onChange={(e) => update('state', e.target.value)}
+          value={v('city')}
+          onChange={(e) => update('city', e.target.value)}
           className="rounded border border-border bg-background px-2 py-1"
         >
-          <option value="">All states</option>
-          {states.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
+          <option value="">All cities</option>
+          {cities.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
             </option>
           ))}
-        </select>
-      </Field>
-      <Field label="Chamber">
-        <select
-          value={v('chamber')}
-          onChange={(e) => update('chamber', e.target.value)}
-          className="rounded border border-border bg-background px-2 py-1"
-        >
-          <option value="">Both</option>
-          <option value="HOUSE">House</option>
-          <option value="SENATE">Senate</option>
-          <option value="UNICAMERAL">Unicameral</option>
         </select>
       </Field>
       <Field label="Year">
@@ -68,7 +56,19 @@ export function PollFilters({ states, pollsters, years }: FiltersProps) {
           ))}
         </select>
       </Field>
-      <Field label="Sponsor type">
+      <Field label="Race type">
+        <select
+          value={v('raceType')}
+          onChange={(e) => update('raceType', e.target.value)}
+          className="rounded border border-border bg-background px-2 py-1"
+        >
+          <option value="">All</option>
+          <option value="primary">Primary</option>
+          <option value="general">General</option>
+          <option value="runoff">Runoff</option>
+        </select>
+      </Field>
+      <Field label="Sponsor">
         <select
           value={v('sponsor')}
           onChange={(e) => update('sponsor', e.target.value)}
@@ -76,8 +76,7 @@ export function PollFilters({ states, pollsters, years }: FiltersProps) {
         >
           <option value="">All</option>
           <option value="nonpartisan">Nonpartisan / News</option>
-          <option value="D">D-sponsored</option>
-          <option value="R">R-sponsored</option>
+          <option value="partisan">Partisan</option>
         </select>
       </Field>
       <Field label="Pollster">

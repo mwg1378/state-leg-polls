@@ -1,6 +1,6 @@
-import type { AccuracyStats } from '@/lib/accuracy'
+import type { AggregateStats } from '@/lib/accuracy'
 
-export function AccuracyCard({ title, sub, stats }: { title: string; sub?: string; stats: AccuracyStats }) {
+export function AccuracyCard({ title, sub, stats }: { title: string; sub?: string; stats: AggregateStats }) {
   return (
     <div className="rounded border border-border/60 p-4">
       <div className="flex items-baseline justify-between gap-2">
@@ -13,11 +13,11 @@ export function AccuracyCard({ title, sub, stats }: { title: string; sub?: strin
       {stats.n === 0 ? (
         <div className="mt-4 text-sm text-muted-foreground">No polls in scope.</div>
       ) : (
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <Stat label="Within 3 pts" value={pct(stats.pctWithin3)} />
-          <Stat label="Within 5 pts" value={pct(stats.pctWithin5)} />
-          <Stat label="Median |error|" value={pts(stats.medianAbsError)} />
-          <Stat label="Mean error (D−R)" value={signedPts(stats.meanSignedError)} />
+        <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+          <Stat label="Called winner" value={pct(stats.pctCalledWinner)} />
+          <Stat label="Called top 2" value={pct(stats.pctCalledTopTwo)} />
+          <Stat label="Median per-cand error" value={pts(stats.medianCandidateError)} />
+          <Stat label="Median margin error" value={pts(stats.medianMarginError)} />
         </div>
       )}
     </div>
@@ -35,8 +35,3 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(0)}%`)
 const pts = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(1)} pts`)
-const signedPts = (n: number | null | undefined) => {
-  if (n == null) return '—'
-  const sign = n > 0 ? '+' : n < 0 ? '−' : ''
-  return `${sign}${Math.abs(n).toFixed(1)} pts`
-}

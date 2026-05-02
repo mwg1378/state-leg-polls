@@ -1,21 +1,34 @@
-import type { ChamberType, PartisanLean, Population, SourceType, SponsorType } from '@db/enums'
+import type { PartisanLean, Population, RaceType, SourceType, SponsorType } from '@db/enums'
+
+export const RACE_TYPE_LABELS: Record<RaceType, string> = {
+  PARTISAN_PRIMARY: 'Partisan primary',
+  NONPARTISAN_PRIMARY: 'Nonpartisan primary',
+  GENERAL: 'General',
+  NONPARTISAN_GENERAL: 'Nonpartisan general',
+  RUNOFF: 'Runoff',
+  SPECIAL_GENERAL: 'Special general',
+  SPECIAL_PRIMARY: 'Special primary',
+  SPECIAL_RUNOFF: 'Special runoff',
+}
+
+export const RACE_TYPE_SHORT: Record<RaceType, string> = {
+  PARTISAN_PRIMARY: 'Primary',
+  NONPARTISAN_PRIMARY: 'Primary',
+  GENERAL: 'General',
+  NONPARTISAN_GENERAL: 'General',
+  RUNOFF: 'Runoff',
+  SPECIAL_GENERAL: 'Special',
+  SPECIAL_PRIMARY: 'Special primary',
+  SPECIAL_RUNOFF: 'Special runoff',
+}
 
 export const SPONSOR_TYPE_LABELS: Record<SponsorType, string> = {
-  CAMPAIGN_D: 'D campaign',
-  CAMPAIGN_R: 'R campaign',
-  PARTY_D: 'D party committee',
-  PARTY_R: 'R party committee',
-  INDEPENDENT_GROUP_D: 'D-aligned group',
-  INDEPENDENT_GROUP_R: 'R-aligned group',
+  CAMPAIGN: 'Campaign',
+  PARTY: 'Party committee',
+  INDEPENDENT_GROUP: 'Independent group',
   NEWS_MEDIA: 'News media',
   NONPARTISAN_PUBLIC: 'Nonpartisan / public',
   UNKNOWN: 'Unknown',
-}
-
-export function sponsorLean(t: SponsorType): 'D' | 'R' | 'NEUTRAL' {
-  if (t === 'CAMPAIGN_D' || t === 'PARTY_D' || t === 'INDEPENDENT_GROUP_D') return 'D'
-  if (t === 'CAMPAIGN_R' || t === 'PARTY_R' || t === 'INDEPENDENT_GROUP_R') return 'R'
-  return 'NEUTRAL'
 }
 
 export const PARTISAN_LEAN_LABELS: Record<PartisanLean, string> = {
@@ -37,14 +50,24 @@ export const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
   NEWS_ARTICLE: 'News article',
   POLLSTER_MEMO: 'Pollster memo',
   CAMPAIGN_SITE: 'Campaign site',
-  CAUCUS_SITE: 'Caucus site',
   AGGREGATOR: 'Aggregator',
+  WIKIPEDIA: 'Wikipedia',
   SOCIAL_MEDIA: 'Social media',
   OTHER: 'Other',
 }
 
-export const CHAMBER_TYPE_SHORT: Record<ChamberType, string> = {
-  HOUSE: 'House',
-  SENATE: 'Senate',
-  UNICAMERAL: 'Legislature',
+const PARTY_PALETTE: Record<string, string> = {
+  D: 'text-blue-400',
+  R: 'text-red-400',
+  I: 'text-yellow-400',
+  G: 'text-emerald-400',
+  L: 'text-amber-400',
+  W: 'text-sky-300',
+  REP: 'text-red-400',
+  DEM: 'text-blue-400',
+}
+
+export function partyColor(party: string | null | undefined): string {
+  if (!party) return 'text-zinc-300'
+  return PARTY_PALETTE[party.toUpperCase()] ?? 'text-zinc-300'
 }

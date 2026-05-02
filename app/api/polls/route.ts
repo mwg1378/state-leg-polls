@@ -8,8 +8,9 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const params: PollFilterParams = {
     state: url.searchParams.get('state') ?? undefined,
-    chamber: url.searchParams.get('chamber') ?? undefined,
+    city: url.searchParams.get('city') ?? undefined,
     year: url.searchParams.get('year') ?? undefined,
+    raceType: url.searchParams.get('raceType') ?? undefined,
     sponsor: url.searchParams.get('sponsor') ?? undefined,
     pollster: url.searchParams.get('pollster') ?? undefined,
     days: url.searchParams.get('days') ?? undefined,
@@ -25,9 +26,10 @@ export async function GET(req: Request) {
       pollster: { select: { slug: true, name: true } },
       race: {
         select: {
-          id: true, stateCode: true, district: true, electionYear: true, electionDate: true, isSpecial: true,
-          dCandidate: true, rCandidate: true, actualMargin: true,
-          chamber: { select: { id: true, type: true, name: true } },
+          id: true, citySlug: true, electionDate: true, electionYear: true, raceType: true, party: true,
+          winnerName: true, winnerPct: true, runnerUpName: true, runnerUpPct: true, topMargin: true,
+          actualResults: true,
+          city: { select: { slug: true, name: true, stateCode: true } },
         },
       },
     },

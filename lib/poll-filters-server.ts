@@ -3,8 +3,9 @@ import type { Prisma } from '@db/client'
 
 export type PollFilterParams = {
   state?: string
-  chamber?: string
+  city?: string
   year?: string
+  raceType?: string
   sponsor?: string
   pollster?: string
   days?: string
@@ -13,15 +14,22 @@ export type PollFilterParams = {
 export function buildPollWhere(p: PollFilterParams): Prisma.PollWhereInput {
   const where: Prisma.PollWhereInput = { status: 'PUBLISHED' }
   const raceWhere: Prisma.RaceWhereInput = {}
-  if (p.state) raceWhere.stateCode = p.state.toUpperCase()
+  if (p.city) raceWhere.citySlug = p.city
   if (p.year) raceWhere.electionYear = parseInt(p.year, 10) || undefined
-  if (p.chamber) raceWhere.chamber = { type: p.chamber as 'HOUSE' | 'SENATE' | 'UNICAMERAL' }
+  if (p.state) raceWhere.city = { stateCode: p.state.toUpperCase() }
+  if (p.raceType) {
+    if (p.raceType === 'primary') {
+      raceWhere.raceType = { in: ['PARTISAN_PRIMARY', 'NONPARTISAN_PRIMARY', 'SPECIAL_PRIMARY'] }
+    } else if (p.raceType === 'general') {
+      raceWhere.raceType = { in: ['GENERAL', 'NONPARTISAN_GENERAL', 'SPECIAL_GENERAL'] }
+    } else if (p.raceType === 'runoff') {
+      raceWhere.raceType = { in: ['RUNOFF', 'SPECIAL_RUNOFF'] }
+    }
+  }
   if (Object.keys(raceWhere).length) where.race = raceWhere
   if (p.pollster) where.pollsterSlug = p.pollster
-  if (p.sponsor === 'D') {
-    where.sponsorType = { in: ['CAMPAIGN_D', 'PARTY_D', 'INDEPENDENT_GROUP_D'] }
-  } else if (p.sponsor === 'R') {
-    where.sponsorType = { in: ['CAMPAIGN_R', 'PARTY_R', 'INDEPENDENT_GROUP_R'] }
+  if (p.sponsor === 'partisan') {
+    where.sponsorType = { in: ['CAMPAIGN', 'PARTY', 'INDEPENDENT_GROUP'] }
   } else if (p.sponsor === 'nonpartisan') {
     where.sponsorType = { in: ['NEWS_MEDIA', 'NONPARTISAN_PUBLIC'] }
   }

@@ -1,6 +1,13 @@
 import { prisma } from '@/prisma/client'
 import { AccuracyCard } from '@/components/accuracy-card'
-import { computeStats, DAYS_BUCKETS, filterBySponsor, inDaysBucket, type ScoredPoll } from '@/lib/accuracy'
+import {
+  computeAggregate,
+  DAYS_BUCKETS,
+  inDaysBucket,
+  isPartisanSponsor,
+  type CandidateResult,
+  type ScoredPoll,
+} from '@/lib/accuracy'
 
 export const revalidate = 300
 
@@ -8,25 +15,32 @@ export default async function AccuracyPage() {
   const rows = await prisma.poll.findMany({
     where: {
       status: 'PUBLISHED',
-      race: { actualMargin: { not: null } },
+      race: { actualResults: { not: undefined } },
     },
     select: {
-      margin: true,
+      id: true,
+      raceId: true,
+      candidates: true,
       daysToElection: true,
       sponsorType: true,
-      race: { select: { actualMargin: true, electionYear: true } },
+      race: { select: { actualResults: true, electionYear: true, raceType: true } },
     },
   })
 
-  const polls: ScoredPoll[] = rows.map((r) => ({
-    margin: r.margin,
-    daysToElection: r.daysToElection,
-    sponsorType: r.sponsorType,
-    electionYear: r.race.electionYear,
-    actualMargin: r.race.actualMargin as number,
-  }))
+  const polls: ScoredPoll[] = rows
+    .filter((r) => r.race.actualResults != null)
+    .map((r) => ({
+      pollId: r.id,
+      raceId: r.raceId,
+      candidates: r.candidates as CandidateResult[],
+      actuals: r.race.actualResults as CandidateResult[],
+      daysToElection: r.daysToElection,
+      sponsorType: r.sponsorType,
+      raceType: r.race.raceType,
+      electionYear: r.race.electionYear,
+    }))
 
-  const overall = computeStats(polls)
+  const overall = computeAggregate(polls)
   const cycles = Array.from(new Set(polls.map((p) => p.electionYear))).sort((a, b) => b - a)
 
   return (
@@ -34,9 +48,9 @@ export default async function AccuracyPage() {
       <header className="space-y-2">
         <h1 className="text-2xl font-bold tracking-tight">Pollster accuracy</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Every poll in our database whose race has a known result is scored against the actual D−R margin.
-          We report % of polls landing within 3 and 5 points, the median absolute error, and the mean signed
-          error (positive = D-leaning bias). All slices are independent — a poll counts in every applicable cut.
+          Every poll in our database whose race has a known final result is scored four ways: did it call the
+          winner; did it call the right top-two; mean per-candidate absolute error; top-two margin error.
+          Different cuts shown below — a poll counts in every applicable bucket.
         </p>
         <div className="text-xs text-muted-foreground">In scope: {polls.length} polls</div>
       </header>
@@ -49,37 +63,60 @@ export default async function AccuracyPage() {
             <AccuracyCard
               key={b.id}
               title={b.label}
-              stats={computeStats(polls.filter((p) => inDaysBucket(p.daysToElection, b.id)))}
+              stats={computeAggregate(polls.filter((p) => inDaysBucket(p.daysToElection, b.id)))}
             />
           ))}
         </div>
       </section>
 
       <section className="space-y-3">
+        <h2 className="text-lg font-semibold">By race type (within 30 days)</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <AccuracyCard
+            title="Primaries (D / R / nonpartisan)"
+            sub="≤30 days · partisan + nonpartisan primaries"
+            stats={computeAggregate(
+              polls.filter(
+                (p) =>
+                  p.daysToElection <= 30 &&
+                  (p.raceType === 'PARTISAN_PRIMARY' || p.raceType === 'NONPARTISAN_PRIMARY' || p.raceType === 'SPECIAL_PRIMARY'),
+              ),
+            )}
+          />
+          <AccuracyCard
+            title="General elections"
+            sub="≤30 days · general / nonpartisan general / special"
+            stats={computeAggregate(
+              polls.filter(
+                (p) =>
+                  p.daysToElection <= 30 &&
+                  (p.raceType === 'GENERAL' || p.raceType === 'NONPARTISAN_GENERAL' || p.raceType === 'SPECIAL_GENERAL'),
+              ),
+            )}
+          />
+          <AccuracyCard
+            title="Runoffs"
+            sub="≤30 days · runoff + special runoff"
+            stats={computeAggregate(
+              polls.filter((p) => p.daysToElection <= 30 && (p.raceType === 'RUNOFF' || p.raceType === 'SPECIAL_RUNOFF')),
+            )}
+          />
+        </div>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="text-lg font-semibold">By sponsor type (within 30 days)</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {(['all', 'nonpartisan', 'D', 'R'] as const).map((cut) => {
-            const subset = filterBySponsor(
-              polls.filter((p) => p.daysToElection <= 30),
-              cut,
-            )
-            return (
-              <AccuracyCard
-                key={cut}
-                title={
-                  cut === 'all'
-                    ? 'All sponsors'
-                    : cut === 'nonpartisan'
-                      ? 'Nonpartisan / news'
-                      : cut === 'D'
-                        ? 'D-sponsored'
-                        : 'R-sponsored'
-                }
-                sub="≤30 days to election"
-                stats={computeStats(subset)}
-              />
-            )
-          })}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <AccuracyCard
+            title="Nonpartisan / news"
+            sub="≤30 days"
+            stats={computeAggregate(polls.filter((p) => p.daysToElection <= 30 && !isPartisanSponsor(p.sponsorType)))}
+          />
+          <AccuracyCard
+            title="Partisan internals"
+            sub="≤30 days · campaigns / parties / aligned groups"
+            stats={computeAggregate(polls.filter((p) => p.daysToElection <= 30 && isPartisanSponsor(p.sponsorType)))}
+          />
         </div>
       </section>
 
@@ -92,7 +129,7 @@ export default async function AccuracyPage() {
                 key={y}
                 title={String(y)}
                 sub="all timings"
-                stats={computeStats(polls.filter((p) => p.electionYear === y))}
+                stats={computeAggregate(polls.filter((p) => p.electionYear === y))}
               />
             ))}
           </div>

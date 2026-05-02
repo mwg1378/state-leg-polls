@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'state-leg-polls',
+  title: 'mayor-polls',
   description:
-    'Aggregating polls of state legislative general elections across all 50 states, both chambers, since 2017.',
+    'Pollster accuracy tracking for US big-city mayoral races (200K+ population) — primaries, generals, and runoffs since 2013.',
 }
 
 export default function RootLayout({

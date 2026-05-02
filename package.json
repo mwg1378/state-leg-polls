@@ -1,5 +1,5 @@
 {
-  "name": "state-leg-polls",
+  "name": "mayor-polls",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,6 +10,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "research:seed": "tsx scripts/research-seed.ts",
+    "research:curated": "tsx scripts/research-curated.ts",
+    "research:import": "tsx scripts/import-jsonl.ts",
     "research:review": "tsx scripts/review-pending.ts"
   },
   "dependencies": {

@@ -54,7 +54,7 @@ async function main() {
       orderBy: { addedAt: 'asc' },
       include: {
         pollster: true,
-        race: { include: { state: true, chamber: true } },
+        race: { include: { city: true } },
       },
     })
     if (!poll) {
@@ -62,11 +62,12 @@ async function main() {
       break
     }
     console.log('\n' + '─'.repeat(60))
-    console.log(`${poll.race.state.name} — ${poll.race.chamber.name} District ${poll.race.district} · ${poll.race.electionYear}`)
+    console.log(`${poll.race.city.name}, ${poll.race.city.stateCode} — ${poll.race.raceType} ${poll.race.party ? `(${poll.race.party})` : ''} · ${poll.race.electionYear}`)
     console.log(`Pollster: ${poll.pollster.name}`)
     console.log(`Sponsor:  ${poll.sponsor} [${poll.sponsorType}]`)
     console.log(`Field:    ${poll.startDate.toISOString().slice(0, 10)} → ${poll.endDate.toISOString().slice(0, 10)} (${poll.daysToElection}d to election)`)
-    console.log(`Result:   D ${poll.dPct.toFixed(1)} / R ${poll.rPct.toFixed(1)} → margin ${poll.margin.toFixed(1)}`)
+    const cands = poll.candidates as Array<{ name: string; pct: number; party?: string | null }>
+    console.log(`Result:   ${cands.map((c) => `${c.name}${c.party ? ` (${c.party})` : ''} ${c.pct.toFixed(1)}`).join(' / ')}`)
     if (poll.sampleSize) console.log(`Sample:   ${poll.sampleSize} (${poll.population})`)
     if (poll.mode) console.log(`Mode:     ${poll.mode}`)
     if (poll.methodologyNotes) console.log(`Notes:    ${poll.methodologyNotes}`)

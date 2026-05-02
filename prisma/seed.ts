@@ -3,7 +3,7 @@ loadEnv({ path: '.env.local' })
 loadEnv()
 
 import { PrismaClient } from '../lib/generated/prisma/client'
-import { ChamberType, PartisanLean, SourceKind } from '../lib/generated/prisma/enums'
+import { PartisanLean, SourceKind } from '../lib/generated/prisma/enums'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
 
@@ -22,139 +22,188 @@ function makePrismaClient() {
 }
 const prisma = makePrismaClient()
 
-const STATES: Array<[string, string]> = [
-  ['AL', 'Alabama'], ['AK', 'Alaska'], ['AZ', 'Arizona'], ['AR', 'Arkansas'],
-  ['CA', 'California'], ['CO', 'Colorado'], ['CT', 'Connecticut'], ['DE', 'Delaware'],
-  ['FL', 'Florida'], ['GA', 'Georgia'], ['HI', 'Hawaii'], ['ID', 'Idaho'],
-  ['IL', 'Illinois'], ['IN', 'Indiana'], ['IA', 'Iowa'], ['KS', 'Kansas'],
-  ['KY', 'Kentucky'], ['LA', 'Louisiana'], ['ME', 'Maine'], ['MD', 'Maryland'],
-  ['MA', 'Massachusetts'], ['MI', 'Michigan'], ['MN', 'Minnesota'], ['MS', 'Mississippi'],
-  ['MO', 'Missouri'], ['MT', 'Montana'], ['NE', 'Nebraska'], ['NV', 'Nevada'],
-  ['NH', 'New Hampshire'], ['NJ', 'New Jersey'], ['NM', 'New Mexico'], ['NY', 'New York'],
-  ['NC', 'North Carolina'], ['ND', 'North Dakota'], ['OH', 'Ohio'], ['OK', 'Oklahoma'],
-  ['OR', 'Oregon'], ['PA', 'Pennsylvania'], ['RI', 'Rhode Island'], ['SC', 'South Carolina'],
-  ['SD', 'South Dakota'], ['TN', 'Tennessee'], ['TX', 'Texas'], ['UT', 'Utah'],
-  ['VT', 'Vermont'], ['VA', 'Virginia'], ['WA', 'Washington'], ['WV', 'West Virginia'],
-  ['WI', 'Wisconsin'], ['WY', 'Wyoming'],
+// 2020 census + 2024 estimates. US cities with population ≥ 200,000.
+// Slugs: lowercase, state suffix to disambiguate (e.g. portland-or, portland-me).
+const CITIES: Array<{ slug: string; name: string; state: string; pop: number }> = [
+  { slug: 'new-york-ny', name: 'New York', state: 'NY', pop: 8336817 },
+  { slug: 'los-angeles-ca', name: 'Los Angeles', state: 'CA', pop: 3898747 },
+  { slug: 'chicago-il', name: 'Chicago', state: 'IL', pop: 2746388 },
+  { slug: 'houston-tx', name: 'Houston', state: 'TX', pop: 2304580 },
+  { slug: 'phoenix-az', name: 'Phoenix', state: 'AZ', pop: 1608139 },
+  { slug: 'philadelphia-pa', name: 'Philadelphia', state: 'PA', pop: 1603797 },
+  { slug: 'san-antonio-tx', name: 'San Antonio', state: 'TX', pop: 1434625 },
+  { slug: 'san-diego-ca', name: 'San Diego', state: 'CA', pop: 1386932 },
+  { slug: 'dallas-tx', name: 'Dallas', state: 'TX', pop: 1304379 },
+  { slug: 'san-jose-ca', name: 'San Jose', state: 'CA', pop: 1013240 },
+  { slug: 'austin-tx', name: 'Austin', state: 'TX', pop: 961855 },
+  { slug: 'jacksonville-fl', name: 'Jacksonville', state: 'FL', pop: 949611 },
+  { slug: 'fort-worth-tx', name: 'Fort Worth', state: 'TX', pop: 918915 },
+  { slug: 'columbus-oh', name: 'Columbus', state: 'OH', pop: 905748 },
+  { slug: 'indianapolis-in', name: 'Indianapolis', state: 'IN', pop: 887642 },
+  { slug: 'charlotte-nc', name: 'Charlotte', state: 'NC', pop: 874579 },
+  { slug: 'san-francisco-ca', name: 'San Francisco', state: 'CA', pop: 873965 },
+  { slug: 'seattle-wa', name: 'Seattle', state: 'WA', pop: 737015 },
+  { slug: 'denver-co', name: 'Denver', state: 'CO', pop: 715522 },
+  { slug: 'washington-dc', name: 'Washington', state: 'DC', pop: 689545 },
+  { slug: 'nashville-tn', name: 'Nashville', state: 'TN', pop: 689447 },
+  { slug: 'oklahoma-city-ok', name: 'Oklahoma City', state: 'OK', pop: 681054 },
+  { slug: 'el-paso-tx', name: 'El Paso', state: 'TX', pop: 678815 },
+  { slug: 'boston-ma', name: 'Boston', state: 'MA', pop: 675647 },
+  { slug: 'portland-or', name: 'Portland', state: 'OR', pop: 652503 },
+  { slug: 'las-vegas-nv', name: 'Las Vegas', state: 'NV', pop: 641903 },
+  { slug: 'detroit-mi', name: 'Detroit', state: 'MI', pop: 639111 },
+  { slug: 'memphis-tn', name: 'Memphis', state: 'TN', pop: 633104 },
+  { slug: 'louisville-ky', name: 'Louisville', state: 'KY', pop: 615366 },
+  { slug: 'baltimore-md', name: 'Baltimore', state: 'MD', pop: 585708 },
+  { slug: 'milwaukee-wi', name: 'Milwaukee', state: 'WI', pop: 577222 },
+  { slug: 'albuquerque-nm', name: 'Albuquerque', state: 'NM', pop: 564559 },
+  { slug: 'tucson-az', name: 'Tucson', state: 'AZ', pop: 542629 },
+  { slug: 'fresno-ca', name: 'Fresno', state: 'CA', pop: 542107 },
+  { slug: 'sacramento-ca', name: 'Sacramento', state: 'CA', pop: 524943 },
+  { slug: 'mesa-az', name: 'Mesa', state: 'AZ', pop: 504258 },
+  { slug: 'kansas-city-mo', name: 'Kansas City', state: 'MO', pop: 508090 },
+  { slug: 'atlanta-ga', name: 'Atlanta', state: 'GA', pop: 498715 },
+  { slug: 'long-beach-ca', name: 'Long Beach', state: 'CA', pop: 466742 },
+  { slug: 'colorado-springs-co', name: 'Colorado Springs', state: 'CO', pop: 478221 },
+  { slug: 'raleigh-nc', name: 'Raleigh', state: 'NC', pop: 467665 },
+  { slug: 'miami-fl', name: 'Miami', state: 'FL', pop: 442241 },
+  { slug: 'virginia-beach-va', name: 'Virginia Beach', state: 'VA', pop: 459470 },
+  { slug: 'omaha-ne', name: 'Omaha', state: 'NE', pop: 486051 },
+  { slug: 'oakland-ca', name: 'Oakland', state: 'CA', pop: 440646 },
+  { slug: 'minneapolis-mn', name: 'Minneapolis', state: 'MN', pop: 429954 },
+  { slug: 'tulsa-ok', name: 'Tulsa', state: 'OK', pop: 413066 },
+  { slug: 'arlington-tx', name: 'Arlington', state: 'TX', pop: 394266 },
+  { slug: 'tampa-fl', name: 'Tampa', state: 'FL', pop: 384959 },
+  { slug: 'new-orleans-la', name: 'New Orleans', state: 'LA', pop: 383997 },
+  { slug: 'wichita-ks', name: 'Wichita', state: 'KS', pop: 397532 },
+  { slug: 'cleveland-oh', name: 'Cleveland', state: 'OH', pop: 372624 },
+  { slug: 'bakersfield-ca', name: 'Bakersfield', state: 'CA', pop: 403455 },
+  { slug: 'aurora-co', name: 'Aurora', state: 'CO', pop: 386261 },
+  { slug: 'anaheim-ca', name: 'Anaheim', state: 'CA', pop: 346824 },
+  { slug: 'honolulu-hi', name: 'Honolulu', state: 'HI', pop: 350964 },
+  { slug: 'santa-ana-ca', name: 'Santa Ana', state: 'CA', pop: 310227 },
+  { slug: 'riverside-ca', name: 'Riverside', state: 'CA', pop: 314998 },
+  { slug: 'corpus-christi-tx', name: 'Corpus Christi', state: 'TX', pop: 317863 },
+  { slug: 'lexington-ky', name: 'Lexington', state: 'KY', pop: 322570 },
+  { slug: 'stockton-ca', name: 'Stockton', state: 'CA', pop: 320804 },
+  { slug: 'henderson-nv', name: 'Henderson', state: 'NV', pop: 322178 },
+  { slug: 'saint-paul-mn', name: 'Saint Paul', state: 'MN', pop: 311527 },
+  { slug: 'st-louis-mo', name: 'St. Louis', state: 'MO', pop: 301578 },
+  { slug: 'cincinnati-oh', name: 'Cincinnati', state: 'OH', pop: 309317 },
+  { slug: 'pittsburgh-pa', name: 'Pittsburgh', state: 'PA', pop: 302971 },
+  { slug: 'greensboro-nc', name: 'Greensboro', state: 'NC', pop: 299035 },
+  { slug: 'anchorage-ak', name: 'Anchorage', state: 'AK', pop: 291247 },
+  { slug: 'plano-tx', name: 'Plano', state: 'TX', pop: 285494 },
+  { slug: 'lincoln-ne', name: 'Lincoln', state: 'NE', pop: 291082 },
+  { slug: 'orlando-fl', name: 'Orlando', state: 'FL', pop: 307573 },
+  { slug: 'irvine-ca', name: 'Irvine', state: 'CA', pop: 307670 },
+  { slug: 'newark-nj', name: 'Newark', state: 'NJ', pop: 311549 },
+  { slug: 'durham-nc', name: 'Durham', state: 'NC', pop: 283506 },
+  { slug: 'chula-vista-ca', name: 'Chula Vista', state: 'CA', pop: 275487 },
+  { slug: 'toledo-oh', name: 'Toledo', state: 'OH', pop: 270871 },
+  { slug: 'fort-wayne-in', name: 'Fort Wayne', state: 'IN', pop: 263886 },
+  { slug: 'jersey-city-nj', name: 'Jersey City', state: 'NJ', pop: 292449 },
+  { slug: 'st-petersburg-fl', name: 'St. Petersburg', state: 'FL', pop: 258308 },
+  { slug: 'laredo-tx', name: 'Laredo', state: 'TX', pop: 261639 },
+  { slug: 'madison-wi', name: 'Madison', state: 'WI', pop: 269840 },
+  { slug: 'lubbock-tx', name: 'Lubbock', state: 'TX', pop: 257141 },
+  { slug: 'winston-salem-nc', name: 'Winston-Salem', state: 'NC', pop: 249545 },
+  { slug: 'garland-tx', name: 'Garland', state: 'TX', pop: 246018 },
+  { slug: 'glendale-az', name: 'Glendale', state: 'AZ', pop: 248325 },
+  { slug: 'hialeah-fl', name: 'Hialeah', state: 'FL', pop: 223109 },
+  { slug: 'reno-nv', name: 'Reno', state: 'NV', pop: 264165 },
+  { slug: 'chesapeake-va', name: 'Chesapeake', state: 'VA', pop: 249422 },
+  { slug: 'gilbert-az', name: 'Gilbert', state: 'AZ', pop: 267918 },
+  { slug: 'baton-rouge-la', name: 'Baton Rouge', state: 'LA', pop: 227470 },
+  { slug: 'irving-tx', name: 'Irving', state: 'TX', pop: 256684 },
+  { slug: 'scottsdale-az', name: 'Scottsdale', state: 'AZ', pop: 241361 },
+  { slug: 'north-las-vegas-nv', name: 'North Las Vegas', state: 'NV', pop: 262527 },
+  { slug: 'fremont-ca', name: 'Fremont', state: 'CA', pop: 230504 },
+  { slug: 'boise-id', name: 'Boise', state: 'ID', pop: 235684 },
+  { slug: 'richmond-va', name: 'Richmond', state: 'VA', pop: 226610 },
+  { slug: 'san-bernardino-ca', name: 'San Bernardino', state: 'CA', pop: 222203 },
+  { slug: 'birmingham-al', name: 'Birmingham', state: 'AL', pop: 200733 },
+  { slug: 'spokane-wa', name: 'Spokane', state: 'WA', pop: 228989 },
+  { slug: 'rochester-ny', name: 'Rochester', state: 'NY', pop: 211328 },
+  { slug: 'des-moines-ia', name: 'Des Moines', state: 'IA', pop: 214133 },
+  { slug: 'modesto-ca', name: 'Modesto', state: 'CA', pop: 218464 },
+  { slug: 'fayetteville-nc', name: 'Fayetteville', state: 'NC', pop: 208501 },
+  { slug: 'tacoma-wa', name: 'Tacoma', state: 'WA', pop: 219346 },
+  { slug: 'oxnard-ca', name: 'Oxnard', state: 'CA', pop: 202063 },
+  { slug: 'fontana-ca', name: 'Fontana', state: 'CA', pop: 208393 },
+  { slug: 'columbus-ga', name: 'Columbus', state: 'GA', pop: 206922 },
+  { slug: 'montgomery-al', name: 'Montgomery', state: 'AL', pop: 200603 },
+  { slug: 'moreno-valley-ca', name: 'Moreno Valley', state: 'CA', pop: 208634 },
+  { slug: 'shreveport-la', name: 'Shreveport', state: 'LA', pop: 187593 },
+  { slug: 'aurora-il', name: 'Aurora', state: 'IL', pop: 180542 },
+  { slug: 'yonkers-ny', name: 'Yonkers', state: 'NY', pop: 211569 },
+  { slug: 'akron-oh', name: 'Akron', state: 'OH', pop: 190469 },
+  { slug: 'huntington-beach-ca', name: 'Huntington Beach', state: 'CA', pop: 198711 },
+  { slug: 'glendale-ca', name: 'Glendale', state: 'CA', pop: 196543 },
+  { slug: 'grand-rapids-mi', name: 'Grand Rapids', state: 'MI', pop: 198917 },
+  { slug: 'salt-lake-city-ut', name: 'Salt Lake City', state: 'UT', pop: 199723 },
+  { slug: 'tallahassee-fl', name: 'Tallahassee', state: 'FL', pop: 196169 },
+  { slug: 'huntsville-al', name: 'Huntsville', state: 'AL', pop: 215006 },
+  { slug: 'worcester-ma', name: 'Worcester', state: 'MA', pop: 206518 },
+  { slug: 'knoxville-tn', name: 'Knoxville', state: 'TN', pop: 190740 },
+  { slug: 'newport-news-va', name: 'Newport News', state: 'VA', pop: 186247 },
+  { slug: 'providence-ri', name: 'Providence', state: 'RI', pop: 190934 },
 ]
 
-// State-specific lower / upper chamber names where they diverge from "House"/"Senate".
-const LOWER_CHAMBER_NAMES: Record<string, string> = {
-  CA: 'State Assembly',
-  NV: 'State Assembly',
-  NJ: 'General Assembly',
-  NY: 'State Assembly',
-  WI: 'State Assembly',
-  VA: 'House of Delegates',
-  WV: 'House of Delegates',
-  MD: 'House of Delegates',
-  MA: 'House of Representatives',
-}
-
-const UPPER_CHAMBER_NAMES: Record<string, string> = {}
-
 const POLLSTERS: Array<{ slug: string; name: string; lean: PartisanLean; url?: string }> = [
-  { slug: 'public-policy-polling', name: 'Public Policy Polling', lean: PartisanLean.D, url: 'https://www.publicpolicypolling.com' },
-  { slug: 'global-strategy-group', name: 'Global Strategy Group', lean: PartisanLean.D, url: 'https://globalstrategygroup.com' },
-  { slug: 'tulchin-research', name: 'Tulchin Research', lean: PartisanLean.D, url: 'https://tulchinresearch.com' },
-  { slug: 'gbao-strategies', name: 'GBAO Strategies', lean: PartisanLean.D, url: 'https://gbaostrategies.com' },
-  { slug: 'fm3-research', name: 'FM3 Research', lean: PartisanLean.D, url: 'https://fm3research.com' },
-  { slug: 'garin-hart-yang', name: 'Garin-Hart-Yang Research Group', lean: PartisanLean.D },
-  { slug: 'change-research', name: 'Change Research', lean: PartisanLean.D, url: 'https://changeresearch.com' },
-  { slug: 'patinkin-research', name: 'Patinkin Research Strategies', lean: PartisanLean.D },
-  { slug: 'lake-research', name: 'Lake Research Partners', lean: PartisanLean.D, url: 'https://lakeresearch.com' },
-  { slug: 'normington-petts', name: 'Normington, Petts & Associates', lean: PartisanLean.D },
-  { slug: 'public-opinion-strategies', name: 'Public Opinion Strategies', lean: PartisanLean.R, url: 'https://pos.org' },
-  { slug: 'cygnal', name: 'Cygnal', lean: PartisanLean.R, url: 'https://www.cygn.al' },
-  { slug: 'echelon-insights', name: 'Echelon Insights', lean: PartisanLean.R, url: 'https://echeloninsights.com' },
-  { slug: 'onmessage-inc', name: 'OnMessage Inc.', lean: PartisanLean.R },
-  { slug: 'mclaughlin-associates', name: 'McLaughlin & Associates', lean: PartisanLean.R },
-  { slug: 'trafalgar-group', name: 'Trafalgar Group', lean: PartisanLean.R, url: 'https://www.thetrafalgargroup.org' },
-  { slug: 'co-efficient', name: 'co/efficient', lean: PartisanLean.R, url: 'https://coefficient.us' },
-  { slug: 'fabrizio-lee', name: 'Fabrizio, Lee & Associates', lean: PartisanLean.R },
-  { slug: 'remington-research', name: 'Remington Research Group', lean: PartisanLean.R },
-  { slug: 'susquehanna-polling', name: 'Susquehanna Polling & Research', lean: PartisanLean.R, url: 'https://susquehannapolling.com' },
-  { slug: 'mason-dixon', name: 'Mason-Dixon Polling & Strategy', lean: PartisanLean.NONPARTISAN, url: 'https://www.masondixonpolling.com' },
-  { slug: 'emerson-college-polling', name: 'Emerson College Polling', lean: PartisanLean.NONPARTISAN, url: 'https://www.emerson.edu/polling' },
-  { slug: 'suffolk-university', name: 'Suffolk University Political Research Center', lean: PartisanLean.NONPARTISAN },
+  { slug: 'siena-college-research', name: 'Siena College Research Institute', lean: PartisanLean.NONPARTISAN },
+  { slug: 'nyt-siena', name: 'New York Times / Siena College', lean: PartisanLean.NONPARTISAN },
   { slug: 'marist-poll', name: 'Marist Poll', lean: PartisanLean.NONPARTISAN, url: 'https://maristpoll.marist.edu' },
-  { slug: 'monmouth-university', name: 'Monmouth University Polling Institute', lean: PartisanLean.NONPARTISAN, url: 'https://www.monmouth.edu/polling-institute' },
-  { slug: 'siena-college-research', name: 'Siena College Research Institute', lean: PartisanLean.NONPARTISAN, url: 'https://scri.siena.edu' },
-  { slug: 'roanoke-college', name: 'Roanoke College Institute for Policy and Opinion Research', lean: PartisanLean.NONPARTISAN, url: 'https://www.roanoke.edu/ipor' },
-  { slug: 'wason-center', name: 'Wason Center for Civic Leadership (Christopher Newport)', lean: PartisanLean.NONPARTISAN },
-  { slug: 'eagleton-rutgers', name: 'Eagleton Center for Public Interest Polling (Rutgers)', lean: PartisanLean.NONPARTISAN },
-  { slug: 'hofstra-university', name: 'Hofstra University', lean: PartisanLean.NONPARTISAN },
   { slug: 'quinnipiac-university', name: 'Quinnipiac University Poll', lean: PartisanLean.NONPARTISAN, url: 'https://poll.qu.edu' },
-  { slug: 'university-of-new-hampshire', name: 'University of New Hampshire Survey Center', lean: PartisanLean.NONPARTISAN, url: 'https://carsey.unh.edu' },
-  { slug: 'st-pete-polls', name: 'St. Pete Polls', lean: PartisanLean.NONPARTISAN, url: 'https://www.stpetepolls.org' },
-  { slug: 'data-orbital', name: 'Data Orbital', lean: PartisanLean.R, url: 'https://www.dataorbital.com' },
-  { slug: 'morning-consult', name: 'Morning Consult', lean: PartisanLean.NONPARTISAN, url: 'https://morningconsult.com' },
-  { slug: 'spry-strategies', name: 'Spry Strategies', lean: PartisanLean.R },
+  { slug: 'monmouth-university', name: 'Monmouth University Polling Institute', lean: PartisanLean.NONPARTISAN },
+  { slug: 'suffolk-university', name: 'Suffolk University Political Research Center', lean: PartisanLean.NONPARTISAN },
+  { slug: 'emerson-college-polling', name: 'Emerson College Polling', lean: PartisanLean.NONPARTISAN },
+  { slug: 'mason-dixon', name: 'Mason-Dixon Polling & Strategy', lean: PartisanLean.NONPARTISAN },
+  { slug: 'public-policy-polling', name: 'Public Policy Polling', lean: PartisanLean.D },
+  { slug: 'change-research', name: 'Change Research', lean: PartisanLean.D },
+  { slug: 'global-strategy-group', name: 'Global Strategy Group', lean: PartisanLean.D },
+  { slug: 'tulchin-research', name: 'Tulchin Research', lean: PartisanLean.D },
+  { slug: 'fm3-research', name: 'FM3 Research', lean: PartisanLean.D },
   { slug: 'embold-research', name: 'Embold Research', lean: PartisanLean.D },
+  { slug: 'public-opinion-strategies', name: 'Public Opinion Strategies', lean: PartisanLean.R },
+  { slug: 'cygnal', name: 'Cygnal', lean: PartisanLean.R },
+  { slug: 'echelon-insights', name: 'Echelon Insights', lean: PartisanLean.R },
+  { slug: 'co-efficient', name: 'co/efficient', lean: PartisanLean.R },
+  { slug: 'fabrizio-lee', name: 'Fabrizio, Lee & Associates', lean: PartisanLean.R },
+  { slug: 'm4-strategies', name: 'M4 Strategies', lean: PartisanLean.R },
   { slug: 'noble-predictive-insights', name: 'Noble Predictive Insights', lean: PartisanLean.NONPARTISAN, url: 'https://noblepredictiveinsights.com' },
-  { slug: 'opinion-savvy', name: 'OpinionSavvy / InsiderAdvantage', lean: PartisanLean.R },
-  { slug: 'cherry-communications', name: 'Cherry Communications', lean: PartisanLean.R },
+  { slug: 'data-orbital', name: 'Data Orbital', lean: PartisanLean.R },
+  { slug: 'morning-consult', name: 'Morning Consult', lean: PartisanLean.NONPARTISAN },
+  { slug: 'st-pete-polls', name: 'St. Pete Polls', lean: PartisanLean.NONPARTISAN },
+  { slug: 'spry-strategies', name: 'Spry Strategies', lean: PartisanLean.R },
+  { slug: 'wpa-intelligence', name: 'WPA Intelligence', lean: PartisanLean.R },
+  { slug: 'normington-petts', name: 'Normington, Petts & Associates', lean: PartisanLean.D },
+  { slug: 'lake-research', name: 'Lake Research Partners', lean: PartisanLean.D },
+  { slug: 'oh-predictive-insights', name: 'OH Predictive Insights', lean: PartisanLean.NONPARTISAN },
+  { slug: 'kpcc-loyola-marymount', name: 'KPCC / Loyola Marymount University', lean: PartisanLean.NONPARTISAN },
+  { slug: 'berkeley-igs', name: 'UC Berkeley IGS', lean: PartisanLean.NONPARTISAN },
+  { slug: 'university-of-chicago-gsi', name: 'University of Chicago GenForward / Center for Effective Government', lean: PartisanLean.NONPARTISAN },
+  { slug: 'capitol-fax-mr-research', name: 'Capitol Fax / M.R. Research', lean: PartisanLean.NONPARTISAN },
+  { slug: 'crain-ogden', name: 'Crain\'s / Ogden & Fry', lean: PartisanLean.NONPARTISAN },
+  { slug: 'wbez-suffolk', name: 'WBEZ / Suffolk University', lean: PartisanLean.NONPARTISAN },
+  { slug: 'patinkin-research', name: 'Patinkin Research Strategies', lean: PartisanLean.D },
+  { slug: 'gbao-strategies', name: 'GBAO Strategies', lean: PartisanLean.D },
+  { slug: 'survey-usa', name: 'SurveyUSA', lean: PartisanLean.NONPARTISAN },
+  { slug: 'kff-public-policy', name: 'KFF', lean: PartisanLean.NONPARTISAN },
+  { slug: 'edison-research', name: 'Edison Research', lean: PartisanLean.NONPARTISAN },
 ]
 
 const SOURCES: Array<{ url: string; label: string; kind: SourceKind; notes?: string }> = [
-  { url: 'https://www.dailykos.com/blogs/elections', label: 'The Downballot — Daily Kos Elections', kind: SourceKind.HTML, notes: 'Aggregator the user flagged. Sweeps state legislative coverage.' },
-  { url: 'https://ballotpedia.org/Polling_on_state_legislative_elections', label: 'Ballotpedia — Polling on state legislative elections', kind: SourceKind.HTML },
-  { url: 'https://www.publicpolicypolling.com/polls/', label: 'Public Policy Polling — polls archive', kind: SourceKind.HTML },
-  { url: 'https://www.cygn.al/category/polls/', label: 'Cygnal — polls archive', kind: SourceKind.HTML },
-  { url: 'https://changeresearch.com/insights/', label: 'Change Research — insights archive', kind: SourceKind.HTML },
-  { url: 'https://emersoncollegepolling.com/category/polls/', label: 'Emerson College Polling — polls', kind: SourceKind.HTML },
-  { url: 'https://www.monmouth.edu/polling-institute/reports/', label: 'Monmouth — polling reports', kind: SourceKind.HTML },
-  { url: 'https://scri.siena.edu/category/polls/', label: 'Siena College Research Institute — polls', kind: SourceKind.HTML },
-  { url: 'https://maristpoll.marist.edu/category/polls/', label: 'Marist Poll archive', kind: SourceKind.HTML },
-  { url: 'https://carsey.unh.edu/research/publications-research?topic=polls', label: 'UNH Survey Center publications', kind: SourceKind.HTML },
-  { url: 'https://wason.cnu.edu/wason-center-polls/', label: 'Wason Center polls (CNU)', kind: SourceKind.HTML },
-  { url: 'https://www.roanoke.edu/inside/a-z_index/ipor/poll_archive', label: 'Roanoke College IPOR poll archive', kind: SourceKind.HTML },
-  { url: 'https://www.stpetepolls.org/', label: 'St. Pete Polls archive', kind: SourceKind.HTML },
-  { url: 'https://www.dataorbital.com/news/', label: 'Data Orbital news/poll releases', kind: SourceKind.HTML },
-  { url: 'https://noblepredictiveinsights.com/insights/', label: 'Noble Predictive Insights releases', kind: SourceKind.HTML },
-  { url: 'https://www.dailykos.com/stories/poll-roundup', label: 'Daily Kos Elections — poll roundups', kind: SourceKind.HTML },
-  { url: 'https://politicsny.com/category/polls/', label: 'PoliticsNY — polls', kind: SourceKind.HTML },
-  { url: 'https://www.politico.com/news/state-politics', label: 'Politico — state politics', kind: SourceKind.HTML },
-  { url: 'https://www.virginiamercury.com/category/polls/', label: 'Virginia Mercury — polls', kind: SourceKind.HTML },
-  { url: 'https://newjerseyglobe.com/category/polls/', label: 'New Jersey Globe — polls', kind: SourceKind.HTML },
+  { url: 'https://en.wikipedia.org/wiki/Category:Mayoral_elections_in_the_United_States', label: 'Wikipedia: mayoral elections category', kind: SourceKind.HTML },
 ]
 
 async function main() {
-  console.log('Seeding states…')
-  for (const [code, name] of STATES) {
-    await prisma.state.upsert({
-      where: { code },
-      update: { name },
-      create: { code, name },
-    })
-  }
-
-  console.log('Seeding chambers…')
-  for (const [code, _name] of STATES) {
-    if (code === 'NE') {
-      await prisma.chamber.upsert({
-        where: { id: 'NE-LEG' },
-        update: {},
-        create: {
-          id: 'NE-LEG',
-          stateCode: code,
-          type: ChamberType.UNICAMERAL,
-          name: 'Nebraska Legislature',
-        },
-      })
-      continue
-    }
-    const lower = LOWER_CHAMBER_NAMES[code] ?? 'House of Representatives'
-    const upper = UPPER_CHAMBER_NAMES[code] ?? 'State Senate'
-    await prisma.chamber.upsert({
-      where: { id: `${code}-HOUSE` },
-      update: { name: lower },
-      create: { id: `${code}-HOUSE`, stateCode: code, type: ChamberType.HOUSE, name: lower },
-    })
-    await prisma.chamber.upsert({
-      where: { id: `${code}-SENATE` },
-      update: { name: upper },
-      create: { id: `${code}-SENATE`, stateCode: code, type: ChamberType.SENATE, name: upper },
+  console.log('Seeding cities…')
+  for (const c of CITIES) {
+    await prisma.city.upsert({
+      where: { slug: c.slug },
+      update: { name: c.name, stateCode: c.state, population: c.pop },
+      create: { slug: c.slug, name: c.name, stateCode: c.state, population: c.pop },
     })
   }
 
@@ -163,12 +212,7 @@ async function main() {
     await prisma.pollster.upsert({
       where: { slug: p.slug },
       update: { name: p.name, defaultPartisanLean: p.lean, websiteUrl: p.url ?? null },
-      create: {
-        slug: p.slug,
-        name: p.name,
-        defaultPartisanLean: p.lean,
-        websiteUrl: p.url ?? null,
-      },
+      create: { slug: p.slug, name: p.name, defaultPartisanLean: p.lean, websiteUrl: p.url ?? null },
     })
   }
 
@@ -181,13 +225,12 @@ async function main() {
     })
   }
 
-  const [stateCount, chamberCount, pollsterCount, sourceCount] = await Promise.all([
-    prisma.state.count(),
-    prisma.chamber.count(),
+  const [cityCount, pollsterCount, sourceCount] = await Promise.all([
+    prisma.city.count(),
     prisma.pollster.count(),
     prisma.source.count(),
   ])
-  console.log(`Seeded: ${stateCount} states, ${chamberCount} chambers, ${pollsterCount} pollsters, ${sourceCount} sources.`)
+  console.log(`Seeded: ${cityCount} cities, ${pollsterCount} pollsters, ${sourceCount} sources.`)
 }
 
 main()

@@ -2,58 +2,64 @@
 
 import {
   CartesianGrid,
-  ComposedChart,
+  Legend,
+  Line,
+  LineChart,
   ReferenceLine,
   ResponsiveContainer,
-  Scatter,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { format } from 'date-fns'
-import { sponsorLean } from '@/lib/labels'
-import type { SponsorType } from '@db/enums'
 
-export type ChartPoint = {
+export type ChartPoll = {
   endDate: string
-  margin: number
   pollster: string
-  sponsor: string
-  sponsorType: SponsorType
+  candidates: Array<{ name: string; pct: number }>
 }
 
-export function RacePollChart({
-  points,
-  electionDate,
-  actualMargin,
-}: {
-  points: ChartPoint[]
-  electionDate: string
-  actualMargin: number | null
-}) {
-  if (points.length === 0) return null
+export type ActualResult = { name: string; pct: number }
 
-  const data = points.map((p) => ({
-    ...p,
-    t: new Date(p.endDate).getTime(),
-  }))
+const PALETTE = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#a855f7', '#06b6d4', '#ec4899', '#84cc16', '#fb923c', '#6366f1']
+
+export function RacePollChart({
+  polls,
+  electionDate,
+  actuals,
+  topCandidateNames,
+}: {
+  polls: ChartPoll[]
+  electionDate: string
+  actuals: ActualResult[] | null
+  topCandidateNames: string[] // which candidate names to draw lines for (typically top 5-6)
+}) {
+  if (polls.length === 0) return null
+
+  // Build wide-format data: one row per poll endDate.
+  const data = polls
+    .map((p) => {
+      const row: Record<string, number | string> = {
+        t: new Date(p.endDate).getTime(),
+        endDate: p.endDate,
+      }
+      for (const c of p.candidates) row[c.name] = c.pct
+      return row
+    })
+    .sort((a, b) => Number(a.t) - Number(b.t))
 
   const electionT = new Date(electionDate).getTime()
 
-  const allMargins = data.map((d) => d.margin)
-  if (actualMargin != null) allMargins.push(actualMargin)
-  const yMin = Math.min(...allMargins) - 5
-  const yMax = Math.max(...allMargins) + 5
-
-  // group by sponsor lean for color
-  const dPoints = data.filter((d) => sponsorLean(d.sponsorType) === 'D')
-  const rPoints = data.filter((d) => sponsorLean(d.sponsorType) === 'R')
-  const nPoints = data.filter((d) => sponsorLean(d.sponsorType) === 'NEUTRAL')
+  const allValues = data.flatMap((d) =>
+    topCandidateNames.map((n) => (typeof d[n] === 'number' ? (d[n] as number) : Number.NaN)).filter((x) => !Number.isNaN(x)),
+  )
+  const yMin = Math.max(0, Math.min(...allValues) - 5)
+  const yMax = Math.min(100, Math.max(...allValues) + 5)
 
   return (
-    <div className="h-72 w-full">
+    <div className="h-80 w-full">
       <ResponsiveContainer>
-        <ComposedChart margin={{ top: 12, right: 16, left: 4, bottom: 4 }}>
+        <LineChart data={data} margin={{ top: 12, right: 16, left: 4, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
           <XAxis
             type="number"
@@ -64,40 +70,49 @@ export function RacePollChart({
             tick={{ fontSize: 11 }}
           />
           <YAxis
-            type="number"
-            dataKey="margin"
             domain={[yMin, yMax]}
-            tickFormatter={(v) => (v > 0 ? `D+${v}` : v < 0 ? `R+${Math.abs(v)}` : '0')}
+            tickFormatter={(v) => `${v}%`}
             stroke="currentColor"
             tick={{ fontSize: 11 }}
-            width={48}
+            width={42}
           />
-          <ReferenceLine y={0} stroke="currentColor" strokeOpacity={0.5} />
-          <ReferenceLine x={electionT} stroke="currentColor" strokeOpacity={0.5} strokeDasharray="4 4" label={{ value: 'Election', position: 'top', fill: 'currentColor', fontSize: 11 }} />
-          {actualMargin != null ? (
-            <ReferenceLine
-              y={actualMargin}
-              stroke="#22c55e"
-              strokeDasharray="4 4"
-              label={{ value: `Actual ${actualMargin > 0 ? 'D+' : 'R+'}${Math.abs(actualMargin).toFixed(1)}`, position: 'right', fill: '#22c55e', fontSize: 11 }}
-            />
-          ) : null}
+          <ReferenceLine
+            x={electionT}
+            stroke="currentColor"
+            strokeOpacity={0.5}
+            strokeDasharray="4 4"
+            label={{ value: 'Election', position: 'top', fill: 'currentColor', fontSize: 11 }}
+          />
+          {(actuals ?? []).map((a, i) =>
+            topCandidateNames.includes(a.name) ? (
+              <ReferenceLine
+                key={`actual-${i}`}
+                y={a.pct}
+                stroke={PALETTE[topCandidateNames.indexOf(a.name) % PALETTE.length]}
+                strokeOpacity={0.5}
+                strokeDasharray="2 4"
+              />
+            ) : null,
+          )}
           <Tooltip
             contentStyle={{ background: 'var(--background)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
             labelFormatter={(t) => format(new Date(t as number), 'MMM d, yyyy')}
-            formatter={(value: unknown, _name, item) => {
-              const p = item.payload as ChartPoint & { t: number }
-              const m = value as number
-              return [
-                `${m > 0 ? 'D+' : m < 0 ? 'R+' : ''}${Math.abs(m).toFixed(1)} — ${p.pollster}`,
-                p.sponsor,
-              ]
-            }}
+            formatter={(v: unknown, name) => [`${(v as number).toFixed(1)}%`, name as string]}
           />
-          <Scatter name="D-sponsored" data={dPoints} fill="#3b82f6" />
-          <Scatter name="R-sponsored" data={rPoints} fill="#ef4444" />
-          <Scatter name="Nonpartisan" data={nPoints} fill="#a1a1aa" />
-        </ComposedChart>
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          {topCandidateNames.map((name, i) => (
+            <Line
+              key={name}
+              type="monotone"
+              dataKey={name}
+              stroke={PALETTE[i % PALETTE.length]}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              connectNulls
+              name={name}
+            />
+          ))}
+        </LineChart>
       </ResponsiveContainer>
     </div>
   )

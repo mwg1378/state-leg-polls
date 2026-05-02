@@ -2,6 +2,7 @@ import { prisma } from '@/prisma/client'
 import { PollFilters } from '@/components/poll-filters'
 import { PollsTable } from '@/components/polls-table'
 import { buildPollWhere, type PollFilterParams } from '@/lib/poll-filters-server'
+import { toPollRow } from '@/app/page'
 
 export const revalidate = 300
 
@@ -13,7 +14,7 @@ export default async function PollsPage({
   const params = await searchParams
   const where = buildPollWhere(params)
 
-  const [polls, states, pollsters, years] = await Promise.all([
+  const [pollsRaw, cities, pollsters, years] = await Promise.all([
     prisma.poll.findMany({
       where,
       orderBy: [{ endDate: 'desc' }, { id: 'desc' }],
@@ -22,21 +23,22 @@ export default async function PollsPage({
         pollster: { select: { slug: true, name: true } },
         race: {
           select: {
-            id: true,
-            stateCode: true,
-            district: true,
-            electionYear: true,
-            dCandidate: true,
-            rCandidate: true,
-            chamber: { select: { type: true, name: true } },
+            id: true, citySlug: true, raceType: true, electionYear: true, party: true,
+            city: { select: { name: true, stateCode: true } },
           },
         },
       },
     }),
-    prisma.state.findMany({ orderBy: { name: 'asc' }, select: { code: true, name: true } }),
+    prisma.city.findMany({
+      where: { races: { some: { polls: { some: { status: 'PUBLISHED' } } } } },
+      orderBy: { name: 'asc' },
+      select: { slug: true, name: true, stateCode: true },
+    }),
     prisma.pollster.findMany({ orderBy: { name: 'asc' }, select: { slug: true, name: true } }),
     prisma.race.findMany({ select: { electionYear: true }, distinct: ['electionYear'], orderBy: { electionYear: 'desc' } }),
   ])
+
+  const polls = pollsRaw.map(toPollRow)
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 space-y-6">
@@ -47,7 +49,7 @@ export default async function PollsPage({
         </p>
       </header>
       <PollFilters
-        states={states.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` }))}
+        cities={cities.map((c) => ({ value: c.slug, label: `${c.name}, ${c.stateCode}` }))}
         pollsters={pollsters.map((p) => ({ value: p.slug, label: p.name }))}
         years={years.map((y) => y.electionYear)}
       />
