@@ -19,12 +19,19 @@ function makeClient() {
     idleTimeoutMillis: 20_000,
     connectionTimeoutMillis: 10_000,
   })
-  const adapter = new PrismaPg(pool)
-  return new PrismaClient({ adapter })
+  return new PrismaClient({ adapter: new PrismaPg(pool) })
 }
 
-export const prisma = globalForPrisma.prisma ?? makeClient()
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+// Lazy proxy so the underlying PrismaClient isn't constructed until first use.
+// This lets scripts call dotenv.config() between import time and first DB use.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_, prop) {
+    if (!globalForPrisma.prisma) {
+      globalForPrisma.prisma = makeClient()
+    }
+    const value = (globalForPrisma.prisma as unknown as Record<string | symbol, unknown>)[prop]
+    return typeof value === 'function' ? value.bind(globalForPrisma.prisma) : value
+  },
+})
 
 export default prisma

@@ -73,9 +73,21 @@ export async function ingestCandidatePoll(
   // Resolve city by name + state. Prefer slug if explicitly given.
   let city = p.citySlug ? await prisma.city.findUnique({ where: { slug: p.citySlug } }) : null
   if (!city) {
+    const normalized = normalizeCityName(cityName)
     city = await prisma.city.findFirst({
       where: { stateCode, name: { equals: cityName, mode: 'insensitive' } },
     })
+    if (!city) {
+      city = await prisma.city.findFirst({
+        where: { stateCode, name: { equals: normalized, mode: 'insensitive' } },
+      })
+    }
+    if (!city) {
+      // Try contains match (handles "St." vs "Saint", etc.)
+      city = await prisma.city.findFirst({
+        where: { stateCode, name: { contains: normalized, mode: 'insensitive' } },
+      })
+    }
   }
   if (!city) return false
 
@@ -204,4 +216,14 @@ function parseDate(v: unknown): Date | null {
   if (typeof v !== 'string') return null
   const d = new Date(v)
   return Number.isNaN(+d) ? null : d
+}
+
+function normalizeCityName(name: string): string {
+  return name
+    .replace(/^City of /i, '')
+    .replace(/ City$/i, '')                 // "New York City" → "New York"
+    .replace(/, D\.C\.?$/i, '')              // "Washington, D.C." → "Washington"
+    .replace(/^Saint /i, 'St. ')             // "Saint Paul" → "St. Paul"
+    .replace(/^St\b\.?\s+/i, 'St. ')         // normalize "St" / "St." → "St. "
+    .trim()
 }
